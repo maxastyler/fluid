@@ -236,6 +236,8 @@ pub fn den_step<'a>(
     den += &(&sources * dt);
     std::mem::swap(&mut den, &mut sources);
     diffuse(Comp::Scalar, den.view_mut(), sources.view(), diff, dt, 20);
+    std::mem::swap(&mut den, &mut sources);
+    advect(Comp::Scalar, den, sources.view(), positions);
 }
 
 #[cfg(test)]
