@@ -84,9 +84,19 @@ pub fn bilinear_interp(point: (f32, f32), a: ArrayView2<f32>) -> f32 {
     let f21 = a[(x2 as usize, y1 as usize)];
     let f22 = a[(x2 as usize, y2 as usize)];
     let (x, y) = point;
-    let r1 = ((x2 - x) / (x2 - x1)) * f11 + ((x - x1) / (x2 - x1)) * f21;
-    let r2 = ((x2 - x) / (x2 - x1)) * f12 + ((x - x1) / (x2 - x1)) * f22;
-    return ((y2 - y) / (y2 - y1)) * r1 + ((y - y1) / (y2 - y1)) * r2;
+    let (r1, r2) = if x2 == x1 {
+        (f11, f22)
+    } else {
+        (
+            ((x2 - x) / (x2 - x1)) * f11 + ((x - x1) / (x2 - x1)) * f21,
+            ((x2 - x) / (x2 - x1)) * f12 + ((x - x1) / (x2 - x1)) * f22,
+        )
+    };
+    if y2 == y1 {
+        r1
+    } else {
+        ((y2 - y) / (y2 - y1)) * r1 + ((y - y1) / (y2 - y1)) * r2
+    }
 }
 
 /// clamp a value between top and bottom
@@ -104,7 +114,6 @@ where
 }
 
 /// Get the positions that the indices are advected from
-/// `old_positions` is indexed [x, y, dim], so dimension is the fastest varying axis
 pub fn advection_positions(
     mut old_positions: ArrayViewMut3<f32>,
     velocities: ArrayView3<f32>,
@@ -115,12 +124,12 @@ pub fn advection_positions(
     let dty = dt * n[2] as f32;
     for i in 1..(n[1] - 1) {
         for j in 1..(n[2] - 1) {
-            old_positions[(i, j, 0)] = clamp(
+            old_positions[(0, i, j)] = clamp(
                 i as f32 - dtx * velocities[(0, i, j)],
                 0.5,
                 n[1] as f32 - 1.5,
             );
-            old_positions[(i, j, 1)] = clamp(
+            old_positions[(1, i, j)] = clamp(
                 j as f32 - dty * velocities[(1, i, j)],
                 0.5,
                 n[2] as f32 - 1.5,
@@ -134,7 +143,7 @@ pub fn advect(c: Comp, mut d: ArrayViewMut2<f32>, d0: ArrayView2<f32>, positions
     let n = d.shape().to_vec();
     for i in 1..(n[0] - 1) {
         for j in 1..(n[1] - 1) {
-            d[(i, j)] = bilinear_interp((positions[(i, j, 0)], positions[(i, j, 1)]), d0);
+            d[(i, j)] = bilinear_interp((positions[(0, i, j)], positions[(1, i, j)]), d0);
         }
     }
     set_bnd(c, d);
@@ -189,6 +198,7 @@ pub fn vel_step<'a>(
 ) {
     vel += &(&forces * dt);
     std::mem::swap(&mut vel, &mut forces);
+
     diffuse(
         Comp::X,
         vel.index_axis_mut(Axis(0), 0),
@@ -197,6 +207,7 @@ pub fn vel_step<'a>(
         dt,
         20,
     );
+
     diffuse(
         Comp::Y,
         vel.index_axis_mut(Axis(0), 1),
@@ -205,16 +216,19 @@ pub fn vel_step<'a>(
         dt,
         20,
     );
+
     project(vel.view_mut(), forces.view_mut(), 20);
     std::mem::swap(&mut vel, &mut forces);
 
     advection_positions(positions.view_mut(), vel.view(), dt);
+
     advect(
         Comp::X,
         vel.index_axis_mut(Axis(0), 0),
         forces.index_axis(Axis(0), 0),
         positions.view(),
     );
+
     advect(
         Comp::Y,
         vel.index_axis_mut(Axis(0), 1),
