@@ -195,6 +195,7 @@ pub fn vel_step<'a>(
     mut forces: ArrayViewMut3<'a, f32>,
     visc: f32,
     dt: f32,
+    iterations: usize,
 ) {
     vel += &(&forces * dt);
     std::mem::swap(&mut vel, &mut forces);
@@ -205,7 +206,7 @@ pub fn vel_step<'a>(
         forces.index_axis(Axis(0), 0),
         visc,
         dt,
-        20,
+        iterations,
     );
 
     diffuse(
@@ -214,10 +215,10 @@ pub fn vel_step<'a>(
         forces.index_axis(Axis(0), 1),
         visc,
         dt,
-        20,
+        iterations,
     );
 
-    project(vel.view_mut(), forces.view_mut(), 20);
+    project(vel.view_mut(), forces.view_mut(), iterations);
     std::mem::swap(&mut vel, &mut forces);
 
     advection_positions(positions.view_mut(), vel.view(), dt);
@@ -235,7 +236,7 @@ pub fn vel_step<'a>(
         forces.index_axis(Axis(0), 1),
         positions.view(),
     );
-    project(vel, forces, 20);
+    project(vel, forces, iterations);
 }
 
 /// Take a density step
@@ -248,11 +249,19 @@ pub fn den_step<'a>(
     diff: f32,
     disp: f32,
     dt: f32,
+    iterations: usize,
 ) {
     let n = sources.shape().to_vec();
     den += &(&sources * dt);
     std::mem::swap(&mut den, &mut sources);
-    diffuse(Comp::Scalar, den.view_mut(), sources.view(), diff, dt, 20);
+    diffuse(
+        Comp::Scalar,
+        den.view_mut(),
+        sources.view(),
+        diff,
+        dt,
+        iterations,
+    );
     std::mem::swap(&mut den, &mut sources);
     advect(Comp::Scalar, den.view_mut(), sources.view(), positions);
     den -= &(disp * dt * (((n[0] - 2) * (n[1] - 2)) as f32) * &den);
@@ -263,7 +272,7 @@ mod tests {
     #[test]
     fn boundary_test() {
         use super::{set_bnd, Comp};
-        use ndarray::{arr2, Array2};
+        use ndarray::arr2;
         let mut my_arr = arr2(&[
             [0.0, 0.0, 0.0],
             [0.0, 1.0, 2.0],
@@ -293,12 +302,10 @@ mod tests {
     }
     #[test]
     fn advection_positions_test() {
-        use super::advection_positions;
-        use ndarray::arr3;
         use ndarray::prelude::*;
-        let mut p: Array3<f32> = Array3::zeros((3, 4, 2));
+        let p: Array3<f32> = Array3::zeros((3, 4, 2));
         let p_copy = p.clone();
-        let new_vals = advection_positions(p.view_mut(), p_copy.view(), 0.2);
+        // let new_vals = advection_positions(p.view_mut(), p_copy.view(), 0.2);
         assert_eq!(p_copy, p);
     }
 }

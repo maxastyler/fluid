@@ -1,4 +1,5 @@
 extern crate gdnative;
+extern crate euclid;
 extern crate ndarray;
 
 pub mod dynamics;
