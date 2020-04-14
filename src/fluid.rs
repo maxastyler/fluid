@@ -17,6 +17,8 @@ pub struct Fluid {
     pub positions: Array3<f32>,
     pub viscosity: f32,
     pub iterations: usize,
+    im: Image,
+    im_t: ImageTexture,
 }
 
 #[methods]
@@ -29,6 +31,8 @@ impl Fluid {
             positions: Array3::zeros(SHAPE_3),
             viscosity: 1.0,
             iterations: 20,
+            im: Image::new(),
+            im_t: ImageTexture::new(),
         }
     }
 
@@ -37,16 +41,34 @@ impl Fluid {
 
     #[export]
     unsafe fn _draw(&mut self, mut owner: Node2D) {
+        self.im.create(
+            self.vel.shape()[1] as i64,
+            self.vel.shape()[2] as i64,
+            true,
+            0,
+        );
+        self.im.lock();
         for i in 0..self.vel.shape()[1] {
             for j in 0..self.vel.shape()[2] {
-                let mut p_arr = Vector2Array::new();
-                let mut c_arr = ColorArray::new();
-                let mut uv_arr = Vector2Array::new();
-                p_arr.push(&Vector2::new(i as f32, j as f32));
-                c_arr.push(&Color::rgb(self.densities[0].0[(i, j)], 0.0, 1.0));
-                owner.draw_primitive(p_arr, c_arr, uv_arr, None, 1.0, None);
+                self.im.set_pixel(i as i64, j as i64, Color::rgb(self.densities[0].0[(i, j)], 0.0, 0.0));
+                // let mut p_arr = Vector2Array::new();
+                // let mut c_arr = ColorArray::new();
+                // let mut uv_arr = Vector2Array::new();
+                // p_arr.push(&Vector2::new(i as f32, j as f32));
+                // c_arr.push(&Color::rgb(self.densities[0].0[(i, j)], 0.0, 1.0));
+                // owner.draw_primitive(p_arr, c_arr, uv_arr, None, 1.0, None);
             }
         }
+        self.im.unlock();
+        self.im_t.create_from_image(Some(self.im.clone()), 0);
+        owner.draw_texture_rect(
+            Some(self.im_t.to_texture()),
+            rect(0.0, 0.0, 500.0, 500.0),
+            false,
+            Color::rgb(1.0, 0.0, 0.0),
+            false,
+            None,
+        );
     }
 
     #[export]
@@ -121,7 +143,7 @@ impl Fluid {
     }
 
     #[export]
-    fn step(&mut self, _: Node2D, dt: f32) -> bool {
+    unsafe fn step(&mut self, mut owner: Node2D, dt: f32) -> bool {
         vel_step(
             self.positions.view_mut(),
             self.vel.view_mut(),
@@ -141,7 +163,8 @@ impl Fluid {
                 self.iterations,
             );
         }
-        return true;
+        owner.update();
+        true
     }
 
     #[export]
