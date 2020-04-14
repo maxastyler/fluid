@@ -27,10 +27,10 @@ impl Fluid {
         Fluid {
             vel: Array3::zeros(SHAPE_3),
             prev_vel: Array3::zeros(SHAPE_3),
-            densities: vec![(Array2::zeros(SHAPE), Array2::zeros(SHAPE), 0.0, 0.0000001)],
+            densities: vec![(Array2::zeros(SHAPE), Array2::zeros(SHAPE), 0.00005, 0.001)],
             positions: Array3::zeros(SHAPE_3),
-            viscosity: 1.0,
-            iterations: 20,
+            viscosity: 1000.0,
+            iterations: 10,
             im: Image::new(),
             im_t: ImageTexture::new(),
         }
@@ -50,7 +50,11 @@ impl Fluid {
         self.im.lock();
         for i in 0..self.vel.shape()[1] {
             for j in 0..self.vel.shape()[2] {
-                self.im.set_pixel(i as i64, j as i64, Color::rgb(self.densities[0].0[(i, j)], 0.0, 0.0));
+                self.im.set_pixel(
+                    i as i64,
+                    j as i64,
+                    Color::rgb(self.densities[0].0[(i, j)], 0.0, 0.0),
+                );
                 // let mut p_arr = Vector2Array::new();
                 // let mut c_arr = ColorArray::new();
                 // let mut uv_arr = Vector2Array::new();
@@ -61,14 +65,45 @@ impl Fluid {
         }
         self.im.unlock();
         self.im_t.create_from_image(Some(self.im.clone()), 0);
+        let b = self.vel.shape().to_vec();
         owner.draw_texture_rect(
             Some(self.im_t.to_texture()),
-            rect(0.0, 0.0, 500.0, 500.0),
+            rect(0.0, 0.0, b[1] as f32, b[2] as f32),
             false,
             Color::rgb(1.0, 0.0, 0.0),
             false,
             None,
         );
+    }
+
+    #[export]
+    unsafe fn _process(&mut self, mut owner: Node2D, dt: f32) {
+        self.prev_vel.index_axis_mut(Axis(1), 10).fill(1000.0);
+        self.prev_vel.index_axis_mut(Axis(1), 13).fill(-1000.0);        
+        if Input::godot_singleton().is_mouse_button_pressed(1) {
+            let b = self.vel.shape().to_vec();
+            let (x, y) = owner.get_local_mouse_position().to_tuple();
+            let x: usize = crate::dynamics::clamp(x, 0.0, (b[1]-1) as f32).round() as usize;
+            let y: usize = crate::dynamics::clamp(y, 0.0, (b[2]-1) as f32).round() as usize;
+            self.densities[0].0[(x, y)] += 1000.0;
+        }
+        if Input::godot_singleton().is_mouse_button_pressed(2) {
+            let b = self.vel.shape().to_vec();
+            let (x, y) = owner.get_local_mouse_position().to_tuple();
+            let x: usize = crate::dynamics::clamp(x, 0.0, (b[1]-1) as f32).round() as usize;
+            let y: usize = crate::dynamics::clamp(y, 0.0, (b[2]-1) as f32).round() as usize;
+            for i in 0..10 {
+                for j in 0..10 {
+                    if let Some(v) = self.prev_vel.get_mut((0, x-i, y-i)) {
+                        *v = -10000.0;
+                    }
+                    if let Some(v) = self.prev_vel.get_mut((0, x+i+1, y+i+1)) {
+                        *v = 10000.0;
+                    }
+                }
+            }
+            // self.prev_vel[(1, x, y)] = 10000.0;
+        }
     }
 
     #[export]
