@@ -8,3 +8,7 @@ edition = "2018"
 
 [dependencies]
 ndarray = "0.13"
+gdnative = "0.8"
+
+[lib]
+crate-type = ["cdylib"]
