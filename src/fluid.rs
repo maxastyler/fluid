@@ -30,7 +30,7 @@ impl Fluid {
             densities: vec![(Array2::zeros(SHAPE), Array2::zeros(SHAPE), 0.00005, 0.001)],
             positions: Array3::zeros(SHAPE_3),
             viscosity: 1000.0,
-            iterations: 10,
+            iterations: 20,
             im: Image::new(),
             im_t: ImageTexture::new(),
         }
